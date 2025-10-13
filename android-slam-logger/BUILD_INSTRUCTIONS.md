@@ -72,10 +72,11 @@ cd android-slam-logger
 
 ### Launch and Test
 1. **Open SLAM Logger** on your device
-2. **Grant Permissions**: Allow camera and storage access
-3. **Start Recording**: Tap "Start Recording" button
-4. **Move Device**: Walk around to collect data
-5. **Stop Recording**: Tap "Stop Recording"
+2. **Grant Permissions**: Allow camera, storage, and location access
+3. **Check GPS Status**: Verify GPS is available (green indicator)
+4. **Start Recording**: Tap "Start Recording" button
+5. **Move Device**: Walk around (outdoors for GPS data)
+6. **Stop Recording**: Tap "Stop Recording"
 
 ### Monitor Output
 ```bash
@@ -113,7 +114,8 @@ collected_data/
     │   └── ... (30 images per second)
     ├── data/
     │   ├── camera_frames.jsonl    # Frame metadata
-    │   └── imu_data.jsonl         # IMU measurements
+    │   ├── imu_data.jsonl         # IMU measurements
+    │   └── gps_data.jsonl         # GPS coordinates
     └── session_metadata.json      # Session summary
 ```
 
@@ -127,6 +129,9 @@ ls collected_data/slam_session_*/images/ | wc -l
 # Check IMU data samples
 wc -l collected_data/slam_session_*/data/imu_data.jsonl
 
+# Check GPS data samples
+wc -l collected_data/slam_session_*/data/gps_data.jsonl
+
 # View session metadata
 cat collected_data/slam_session_*/session_metadata.json
 ```
@@ -134,15 +139,18 @@ cat collected_data/slam_session_*/session_metadata.json
 ### Expected Rates
 - **Camera**: ~30 frames per second
 - **IMU**: ~200 samples per second (100 accelerometer + 100 gyroscope)
-- **Storage**: ~1-2 MB per second of recording
+- **GPS**: ~1 sample per second (if available)
+- **Storage**: ~1-2 MB per second of recording plus GPS data
 
 ## Troubleshooting
 
 ### Permission Denied
 ```bash
-# Grant storage permissions manually
+# Grant all permissions manually
 adb shell pm grant com.iitj.slamlogger android.permission.WRITE_EXTERNAL_STORAGE
 adb shell pm grant com.iitj.slamlogger android.permission.READ_EXTERNAL_STORAGE
+adb shell pm grant com.iitj.slamlogger android.permission.ACCESS_FINE_LOCATION
+adb shell pm grant com.iitj.slamlogger android.permission.ACCESS_COARSE_LOCATION
 ```
 
 ### ADB Connection Issues
@@ -164,9 +172,10 @@ adb connect <DEVICE_IP>:5555
 ## Next Steps
 
 Once you have collected data:
-1. **Verify synchronization** between camera and IMU timestamps
-2. **Test with ORB-SLAM3** or other SLAM frameworks
-3. **Analyze data quality** and collection rates
+1. **Verify synchronization** between camera, IMU, and GPS timestamps
+2. **Test with ORB-SLAM3** or other SLAM frameworks with GPS integration
+3. **Analyze data quality** and collection rates for all sensors
 4. **Document indoor/outdoor performance** differences
+5. **Evaluate GPS accuracy** for outdoor SLAM applications
 
-The collected data will be used for the next phase: integrating with SLAM algorithms and benchmarking performance.
+The collected data will be used for the next phase: integrating with SLAM algorithms and benchmarking performance with GPS-enhanced visual-inertial odometry.

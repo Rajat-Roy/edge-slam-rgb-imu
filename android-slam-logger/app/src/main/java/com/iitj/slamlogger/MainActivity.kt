@@ -36,9 +36,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var frameCountText: TextView
     private lateinit var imuCountText: TextView
+    private lateinit var gpsCountText: TextView
+    private lateinit var gpsStatusText: TextView
 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var sensorCollector: SensorDataCollector
+    private lateinit var gpsCollector: GPSDataCollector
     private lateinit var dataLogger: DataLogger
 
     private var imageAnalysis: ImageAnalysis? = null
@@ -51,8 +54,9 @@ class MainActivity : AppCompatActivity() {
         val allGranted = permissions.entries.all { it.value }
         if (allGranted) {
             startCamera()
+            updateGPSStatus()
         } else {
-            Toast.makeText(this, "Permissions required for camera and storage", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Permissions required for camera, storage, and GPS", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -67,10 +71,13 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         frameCountText = findViewById(R.id.frameCountText)
         imuCountText = findViewById(R.id.imuCountText)
+        gpsCountText = findViewById(R.id.gpsCountText)
+        gpsStatusText = findViewById(R.id.gpsStatusText)
 
         // Initialize components
         cameraExecutor = Executors.newSingleThreadExecutor()
         sensorCollector = SensorDataCollector(this)
+        gpsCollector = GPSDataCollector(this)
         dataLogger = DataLogger(this)
 
         // Set up button listeners
@@ -91,13 +98,27 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // Start collecting GPS data flow
+        lifecycleScope.launch {
+            gpsCollector.dataFlow.collect { gpsData ->
+                if (isRecording) {
+                    dataLogger.logGPSData(gpsData)
+                    withContext(Dispatchers.Main) {
+                        gpsCountText.text = "GPS samples: ${dataLogger.getGPSCount()}"
+                    }
+                }
+            }
+        }
     }
 
     private fun checkPermissions() {
         val requiredPermissions = arrayOf(
             Manifest.permission.CAMERA,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
         )
 
         val missingPermissions = requiredPermissions.filter {
@@ -106,6 +127,7 @@ class MainActivity : AppCompatActivity() {
 
         if (missingPermissions.isEmpty()) {
             startCamera()
+            updateGPSStatus()
         } else {
             requestPermissionLauncher.launch(requiredPermissions)
         }
@@ -149,17 +171,25 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val sessionId = dataLogger.startSession()
-                sensorCollector.startRecording()
+                val imuStarted = sensorCollector.startRecording()
+                val gpsStarted = gpsCollector.startRecording()
+
+                if (!gpsStarted) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "GPS not available - continuing without GPS", Toast.LENGTH_LONG).show()
+                    }
+                }
 
                 withContext(Dispatchers.Main) {
                     isRecording = true
                     frameNumber = 0
                     recordButton.isEnabled = false
                     stopButton.isEnabled = true
-                    statusText.text = "Recording... Session: $sessionId"
+                    val gpsStatus = if (gpsStarted) "GPS active" else "GPS unavailable"
+                    statusText.text = "Recording... Session: $sessionId ($gpsStatus)"
                 }
 
-                Log.d("SLAM", "Started recording session: $sessionId")
+                Log.d("SLAM", "Started recording session: $sessionId, GPS: $gpsStarted")
             } catch (e: Exception) {
                 Log.e("SLAM", "Failed to start recording", e)
                 withContext(Dispatchers.Main) {
@@ -174,12 +204,13 @@ class MainActivity : AppCompatActivity() {
             try {
                 isRecording = false
                 sensorCollector.stopRecording()
+                gpsCollector.stopRecording()
                 val metadata = dataLogger.endSession()
 
                 withContext(Dispatchers.Main) {
                     recordButton.isEnabled = true
                     stopButton.isEnabled = false
-                    statusText.text = "Recording stopped. Frames: ${metadata.totalFrames}, IMU: ${metadata.totalImuSamples}"
+                    statusText.text = "Recording stopped. Frames: ${metadata.totalFrames}, IMU: ${metadata.totalImuSamples}, GPS: ${metadata.totalGpsSamples}"
                 }
 
                 Log.d("SLAM", "Recording stopped. Session saved to: ${dataLogger.getSessionDir()}")
@@ -262,5 +293,27 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         sensorCollector.stopRecording()
+        gpsCollector.stopRecording()
+    }
+
+    private fun updateGPSStatus() {
+        val isAvailable = gpsCollector.isGPSAvailable()
+        val lastLocation = gpsCollector.getLastKnownLocation()
+
+        lifecycleScope.launch {
+            withContext(Dispatchers.Main) {
+                if (isAvailable) {
+                    gpsStatusText.text = "GPS: Available"
+                    gpsStatusText.setTextColor(getColor(android.R.color.holo_green_dark))
+                } else {
+                    gpsStatusText.text = "GPS: Unavailable"
+                    gpsStatusText.setTextColor(getColor(android.R.color.holo_red_dark))
+                }
+
+                lastLocation?.let { location ->
+                    Log.d("SLAM", "Last known location: ${location.latitude}, ${location.longitude}")
+                }
+            }
+        }
     }
 }

@@ -11,12 +11,13 @@ This is an MTech project at IIT Jodhpur (2025-26) focused on developing **Effici
 ## Architecture
 
 ### Android Data Collection System
-The main working component is an Android application (`android-slam-logger/`) that captures synchronized RGB camera frames and IMU sensor data:
+The main working component is an Android application (`android-slam-logger/`) that captures synchronized RGB camera frames, IMU sensor data, and GPS coordinates:
 
 - **MainActivity.kt**: Core camera capture and UI management using CameraX
 - **SensorDataCollector.kt**: High-frequency (200Hz) IMU data collection from accelerometer/gyroscope
+- **GPSDataCollector.kt**: GPS location tracking at 1Hz with network fallback
 - **DataLogger.kt**: File storage and session management with JSON Lines format
-- **Data Pipeline**: CameraX ImageAnalysis → YUV to JPEG conversion → synchronized timestamping
+- **Data Pipeline**: CameraX ImageAnalysis → YUV to JPEG conversion → synchronized timestamping across all sensors
 
 ### Data Format Structure
 ```
@@ -24,15 +25,18 @@ slam_session_YYYYMMDD_HHMMSS/
 ├── images/frame_000001.jpg → frame_000608.jpg     # RGB frames @ 30fps
 ├── data/
 │   ├── camera_frames.jsonl    # Frame metadata (timestamps, dimensions)
-│   └── imu_data.jsonl         # IMU measurements @ 200Hz
+│   ├── imu_data.jsonl         # IMU measurements @ 200Hz
+│   └── gps_data.jsonl         # GPS coordinates @ 1Hz
 └── session_metadata.json      # Performance summary and statistics
 ```
 
 **Key Technical Details**:
-- All timestamps use `System.nanoTime()` for perfect synchronization
+- All timestamps use `System.nanoTime()` for perfect synchronization across all sensors
 - IMU data includes accelerometer (m/s²) and gyroscope (rad/s) measurements
+- GPS data includes latitude/longitude, altitude, accuracy, speed, and bearing
 - JPEG compression at 90% quality with 640×480 resolution
 - Streaming JSON Lines format prevents memory issues during long sessions
+- Network location fallback when GPS unavailable
 
 ## Development Commands
 
@@ -59,6 +63,7 @@ adb pull /sdcard/Android/data/com.iitj.slamlogger/files/Documents/SLAMLogger/ ./
 # Verify data quality after collection
 ls data/slam_session_*/images/ | wc -l                    # Count frames
 wc -l data/slam_session_*/data/imu_data.jsonl            # Count IMU samples
+wc -l data/slam_session_*/data/gps_data.jsonl            # Count GPS samples
 cat data/slam_session_*/session_metadata.json             # Check performance metrics
 ```
 
@@ -81,13 +86,15 @@ cat data/slam_session_*/session_metadata.json             # Check performance me
 ### Performance Targets (Achieved)
 - **Camera Frame Rate**: 30 fps (achieved 25.8 fps)
 - **IMU Sampling**: 200 Hz (achieved 398.8 Hz)
-- **Data Storage**: ~1-2 MB per second
-- **Synchronization**: Nanosecond precision timestamps
+- **GPS Sampling**: 1 Hz (standard GPS limitation)
+- **Data Storage**: ~1-2 MB per second plus GPS data
+- **Synchronization**: Nanosecond precision timestamps across all sensors
 
 ### Android Dependencies
 - **Camera**: CameraX 1.3.0 for robust frame capture
 - **JSON**: Gson 2.10.1 for structured data logging
 - **Coroutines**: Kotlinx 1.7.3 for asynchronous operations
+- **Location**: Android LocationManager for GPS tracking
 - **Target SDK**: API 24+ (Android 7.0+)
 
 ### Wireless Development Workflow
@@ -97,9 +104,10 @@ The project uses wireless ADB debugging to enable natural device movement during
 
 The collected data is structured for compatibility with existing SLAM frameworks:
 - **ORB-SLAM3**: Requires format conversion from JSON Lines
-- **VINS-Mono**: Compatible with JSON preprocessing
-- **Standard Datasets**: Comparable to EuRoC/TUM format structure
-- **Custom Pipelines**: Direct access to raw sensor streams
+- **VINS-Mono**: Compatible with JSON preprocessing, GPS integration possible
+- **GPS-Enhanced SLAM**: Direct access to synchronized GPS + visual + inertial data
+- **Standard Datasets**: Comparable to EuRoC/TUM format structure with GPS addition
+- **Custom Pipelines**: Direct access to raw sensor streams with perfect synchronization
 
 ## Development Environment Notes
 

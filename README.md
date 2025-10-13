@@ -6,15 +6,15 @@ The project explores **RGB + IMU fusion** for real-time SLAM, optimized for mobi
 ---
 
 ## 📌 Project Overview
-- **Objective:** Design a **visual-inertial SLAM pipeline** robust to real-world noise and deployable on edge hardware.  
+- **Objective:** Design a **visual-inertial-GNSS SLAM pipeline** robust to real-world noise and deployable on edge hardware.
 - **Scope:**
-  - Semester 1:  
-    - Build a mobile app to collect **RGB + IMU data**.  
-    - Survey what other mobile sensors (barometer, magnetometer, depth APIs) can support SLAM.  
-    - Review existing mobile/edge SLAM frameworks (ARCore, ARKit, VINS-Mono, ORB-SLAM3).  
-  - Semester 2:  
-    - Implement a full **SLAM pipeline** (tracking + mapping + loop closure).  
-    - Optimize using **CUDA/TensorRT, pruning, quantization**.  
+  - Semester 1:
+    - Build a mobile app to collect **RGB + IMU + GPS data**. ✅ **COMPLETED**
+    - Survey what other mobile sensors (barometer, magnetometer, depth APIs) can support SLAM.
+    - Review existing mobile/edge SLAM frameworks (ARCore, ARKit, VINS-Mono, ORB-SLAM3).
+  - Semester 2:
+    - Implement a full **SLAM pipeline** with GPS integration (tracking + mapping + loop closure).
+    - Optimize using **CUDA/TensorRT, pruning, quantization**.
     - Benchmark on standard datasets (TUM, EuRoC, KITTI) and mobile logs.
 
 ---
@@ -29,10 +29,10 @@ The project explores **RGB + IMU fusion** for real-time SLAM, optimized for mobi
 ---
 
 ## 🚀 Deliverables
-- Mobile app for sensor logging.  
-- Literature + sensor survey.  
-- Prototype SLAM pipeline.  
-- CUDA/TensorRT optimized benchmarks.  
+- ✅ Mobile app for **RGB + IMU + GPS** sensor logging.
+- Literature + sensor survey.
+- Prototype SLAM pipeline with GPS integration.
+- CUDA/TensorRT optimized benchmarks.
 - Documentation + reproducible code.  
 
 ---

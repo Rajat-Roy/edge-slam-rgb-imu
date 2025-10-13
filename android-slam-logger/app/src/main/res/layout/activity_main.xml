@@ -48,6 +48,25 @@
             android:textSize="14sp"
             android:gravity="center" />
 
+        <TextView
+            android:id="@+id/gpsStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPS: Checking..."
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/gpsCountText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPS samples: 0"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:gravity="center" />
+
     </LinearLayout>
 
     <!-- Control Buttons -->

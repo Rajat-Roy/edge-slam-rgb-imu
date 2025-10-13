@@ -25,8 +25,10 @@ data class SessionMetadata(
     val endTime: Long,
     val totalFrames: Int,
     val totalImuSamples: Int,
+    val totalGpsSamples: Int,
     val frameRate: Double,
-    val imuSampleRate: Double
+    val imuSampleRate: Double,
+    val gpsSampleRate: Double
 )
 
 class DataLogger(private val context: Context) {
@@ -35,10 +37,12 @@ class DataLogger(private val context: Context) {
     private var sessionDir: File? = null
     private var imuWriter: FileWriter? = null
     private var cameraWriter: FileWriter? = null
+    private var gpsWriter: FileWriter? = null
 
     private var startTime: Long = 0
     private var frameCount = 0
     private var imuCount = 0
+    private var gpsCount = 0
 
     suspend fun startSession(): String = withContext(Dispatchers.IO) {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -56,10 +60,12 @@ class DataLogger(private val context: Context) {
         // Initialize data files
         imuWriter = FileWriter(File(sessionDir, "data/imu_data.jsonl"))
         cameraWriter = FileWriter(File(sessionDir, "data/camera_frames.jsonl"))
+        gpsWriter = FileWriter(File(sessionDir, "data/gps_data.jsonl"))
 
         startTime = System.currentTimeMillis()
         frameCount = 0
         imuCount = 0
+        gpsCount = 0
 
         sessionId
     }
@@ -83,6 +89,15 @@ class DataLogger(private val context: Context) {
         }
     }
 
+    suspend fun logGPSData(gpsData: GPSData) = withContext(Dispatchers.IO) {
+        gpsWriter?.let { writer ->
+            val json = gson.toJson(gpsData)
+            writer.appendLine(json)
+            writer.flush()
+            gpsCount++
+        }
+    }
+
     suspend fun endSession() = withContext(Dispatchers.IO) {
         val endTime = System.currentTimeMillis()
         val duration = (endTime - startTime) / 1000.0
@@ -90,6 +105,7 @@ class DataLogger(private val context: Context) {
         // Close writers
         imuWriter?.close()
         cameraWriter?.close()
+        gpsWriter?.close()
 
         // Create session metadata
         val metadata = SessionMetadata(
@@ -98,8 +114,10 @@ class DataLogger(private val context: Context) {
             endTime = endTime,
             totalFrames = frameCount,
             totalImuSamples = imuCount,
+            totalGpsSamples = gpsCount,
             frameRate = frameCount / duration,
-            imuSampleRate = imuCount / duration
+            imuSampleRate = imuCount / duration,
+            gpsSampleRate = gpsCount / duration
         )
 
         // Save metadata
@@ -121,4 +139,5 @@ class DataLogger(private val context: Context) {
 
     fun getFrameCount(): Int = frameCount
     fun getIMUCount(): Int = imuCount
+    fun getGPSCount(): Int = gpsCount
 }
