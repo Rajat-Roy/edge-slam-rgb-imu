@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.iitj.slamlogger.app-merged_res-41:/xml_backup_rules.xml.flat",
+        "source": "com.iitj.slamlogger.app-main-43:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.iitj.slamlogger.app-merged_res-41:/layout_activity_main.xml.flat",
+        "source": "com.iitj.slamlogger.app-main-43:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.iitj.slamlogger.app-merged_res-41:/xml_data_extraction_rules.xml.flat",
+        "source": "com.iitj.slamlogger.app-main-43:/xml/data_extraction_rules.xml"
+    }
+]

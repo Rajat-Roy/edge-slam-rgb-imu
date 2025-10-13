@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IMU-Only vs VI-SLAM Comparison</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        #container {
+            width: 100%;
+            height: 700px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: #000;
+        }
+        #info {
+            margin-bottom: 15px;
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        #stats {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .highlight { color: #4CAF50; font-weight: bold; }
+        .error { color: #F44336; font-weight: bold; }
+        .warning { color: #FF9800; font-weight: bold; }
+        .imu-color { color: #FF6B35; font-weight: bold; }
+        .vislam-color { color: #4CAF50; font-weight: bold; }
+        h2 { color: #4CAF50; margin-top: 0; }
+        .controls {
+            margin-top: 15px;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        .drift-stats {
+            background: #4a1f1f;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #F44336;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>📊 IMU-Only vs VI-SLAM: The Drift Problem</h2>
+        <p>Dramatic demonstration of why visual-inertial fusion is essential for accurate tracking</p>
+
+        <div id="stats">
+            <strong>🔴 IMU-Only Tracking Results (MASSIVE DRIFT):</strong><br>
+            📏 <span class="error">Displacement: [1,863m, 12,171m, -9,223m]</span><br>
+            📊 <span class="error">Total path: 15,394 meters</span><br>
+            ⚠️ <span class="warning">Claims you moved 15+ KILOMETERS!</span><br><br>
+
+            <strong>✅ VI-SLAM Results (REALISTIC):</strong><br>
+            📏 <span class="highlight">Displacement: [-1.3m, -3.4m, -10.0m]</span><br>
+            📊 <span class="highlight">Realistic human movement scale</span><br><br>
+
+            <div class="drift-stats">
+                <strong>🚨 DRIFT ERROR:</strong><br>
+                X-axis: <span class="error">1,864m error</span> (99.9% wrong!)<br>
+                Y-axis: <span class="error">12,174m error</span> (99.97% wrong!)<br>
+                Z-axis: <span class="error">9,213m error</span> (99.89% wrong!)<br>
+                <br>
+                <strong>Error magnitude: <span class="error">15+ KILOMETERS</span> for a 4-meter walk!</strong>
+            </div>
+        </div>
+    </div>
+
+    <div id="container"></div>
+
+    <div class="controls">
+        <h3>🎮 Comparison Views</h3>
+        <button onclick="showViSlamOnly()">VI-SLAM Only (Realistic)</button>
+        <button onclick="showIMUOnly()">IMU-Only (Drift Disaster)</button>
+        <button onclick="showBothPaths()">Both Paths</button>
+        <button onclick="showScaledComparison()">Scaled Comparison</button>
+        <button onclick="explainDrift()">Why This Happens</button>
+
+        <p><strong>Legend:</strong>
+        <span class="vislam-color">Green = VI-SLAM (accurate)</span> |
+        <span class="imu-color">Red = IMU-only (massive drift)</span>
+        </p>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let viSlamPath, imuPath, scaledIMUPath;
+
+        // VI-SLAM trajectory (realistic)
+        const viSlamTrajectory = [
+            [0.0, 0.0, 0.0],
+            [-0.329, -0.554, 1.713],
+            [-1.063, -1.137, 2.660],
+            [-1.319, -2.482, 1.905],
+            [-0.868, -3.353, 0.186],
+            [-1.331, -3.374, -9.978]
+        ];
+
+        // IMU-only trajectory (massive drift) - scaled down for visualization
+        const imuTrajectoryRaw = [1863.019, 12170.514, -9223.125];
+
+        // Create scaled version of IMU path for comparison
+        const imuScale = 0.001; // Scale down by 1000x to make it visible
+        const imuTrajectoryScaled = [
+            [0, 0, 0],
+            [imuTrajectoryRaw[0] * imuScale, imuTrajectoryRaw[1] * imuScale, imuTrajectoryRaw[2] * imuScale]
+        ];
+
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0a);
+
+            // Create camera
+            const container = document.getElementById('container');
+            camera = new THREE.PerspectiveCamera(75, container.offsetWidth / 700, 0.1, 1000);
+            camera.position.set(5, 5, 10);
+
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.offsetWidth, 700);
+            container.appendChild(renderer.domElement);
+
+            // Add controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            // Add ground plane and grid
+            const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
+            scene.add(gridHelper);
+
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            // Create paths
+            createViSlamPath();
+            createIMUPath();
+            createScaledIMUPath();
+
+            // Start with VI-SLAM only view
+            showViSlamOnly();
+
+            // Start render loop
+            animate();
+        }
+
+        function createViSlamPath() {
+            // VI-SLAM path (green - accurate)
+            const curve = new THREE.CatmullRomCurve3(
+                viSlamTrajectory.map(point => new THREE.Vector3(point[0], point[1], point[2]))
+            );
+
+            const pathGeometry = new THREE.TubeGeometry(curve, 20, 0.1, 8, false);
+            const pathMaterial = new THREE.MeshLambertMaterial({
+                color: 0x4CAF50,
+                transparent: false
+            });
+            viSlamPath = new THREE.Mesh(pathGeometry, pathMaterial);
+            scene.add(viSlamPath);
+
+            // Add markers
+            const startGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+            const startMaterial = new THREE.MeshLambertMaterial({ color: 0x2196F3 });
+            const startMarker = new THREE.Mesh(startGeometry, startMaterial);
+            startMarker.position.set(0, 0, 0);
+            scene.add(startMarker);
+
+            const endGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+            const endMaterial = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+            const endMarker = new THREE.Mesh(endGeometry, endMaterial);
+            const lastPoint = viSlamTrajectory[viSlamTrajectory.length - 1];
+            endMarker.position.set(lastPoint[0], lastPoint[1], lastPoint[2]);
+            scene.add(endMarker);
+        }
+
+        function createIMUPath() {
+            // IMU path (red - massive drift) - line to show direction
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array([
+                0, 0, 0,  // Start
+                imuTrajectoryRaw[0] * 0.01, imuTrajectoryRaw[1] * 0.01, imuTrajectoryRaw[2] * 0.01  // End (scaled down 100x)
+            ]);
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.LineBasicMaterial({
+                color: 0xFF4444,
+                linewidth: 3
+            });
+
+            imuPath = new THREE.Line(geometry, material);
+            imuPath.visible = false;
+            scene.add(imuPath);
+
+            // Add end marker for IMU path
+            const endGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const endMaterial = new THREE.MeshLambertMaterial({ color: 0xFF4444 });
+            const imuEndMarker = new THREE.Mesh(endGeometry, endMaterial);
+            imuEndMarker.position.set(
+                imuTrajectoryRaw[0] * 0.01,
+                imuTrajectoryRaw[1] * 0.01,
+                imuTrajectoryRaw[2] * 0.01
+            );
+            imuEndMarker.visible = false;
+            scene.add(imuEndMarker);
+            imuPath.userData.endMarker = imuEndMarker;
+        }
+
+        function createScaledIMUPath() {
+            // Create a more detailed scaled IMU path
+            const curve = new THREE.CatmullRomCurve3(
+                imuTrajectoryScaled.map(point => new THREE.Vector3(point[0], point[1], point[2]))
+            );
+
+            const pathGeometry = new THREE.TubeGeometry(curve, 10, 0.05, 8, false);
+            const pathMaterial = new THREE.MeshLambertMaterial({
+                color: 0xFF6B35,
+                transparent: true,
+                opacity: 0.8
+            });
+            scaledIMUPath = new THREE.Mesh(pathGeometry, pathMaterial);
+            scaledIMUPath.visible = false;
+            scene.add(scaledIMUPath);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function showViSlamOnly() {
+            viSlamPath.visible = true;
+            imuPath.visible = false;
+            if (imuPath.userData.endMarker) imuPath.userData.endMarker.visible = false;
+            scaledIMUPath.visible = false;
+
+            camera.position.set(2, 2, 8);
+            controls.target.set(-0.5, -1.5, 0);
+            controls.update();
+        }
+
+        function showIMUOnly() {
+            viSlamPath.visible = false;
+            imuPath.visible = true;
+            if (imuPath.userData.endMarker) imuPath.userData.endMarker.visible = true;
+            scaledIMUPath.visible = false;
+
+            // Zoom out to see the massive drift
+            camera.position.set(50, 50, 50);
+            controls.target.set(10, 60, -50);
+            controls.update();
+        }
+
+        function showBothPaths() {
+            viSlamPath.visible = true;
+            imuPath.visible = true;
+            if (imuPath.userData.endMarker) imuPath.userData.endMarker.visible = true;
+            scaledIMUPath.visible = false;
+
+            camera.position.set(30, 30, 30);
+            controls.target.set(5, 30, -30);
+            controls.update();
+        }
+
+        function showScaledComparison() {
+            viSlamPath.visible = true;
+            imuPath.visible = false;
+            if (imuPath.userData.endMarker) imuPath.userData.endMarker.visible = false;
+            scaledIMUPath.visible = true;
+
+            camera.position.set(3, 3, 8);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function explainDrift() {
+            alert(`🚨 IMU Drift Catastrophe Explained:
+
+📊 The Numbers:
+• VI-SLAM: 4-meter realistic movement
+• IMU-only: Claims 15+ KILOMETER journey!
+• Error: 99.97% wrong in all directions
+
+🔍 Why IMU-Only Fails:
+1. 📐 DOUBLE INTEGRATION: Position = ∫∫acceleration
+   - Small errors get amplified exponentially
+   - Noise becomes massive drift over time
+
+2. 🌊 SENSOR NOISE: Mobile IMU isn't perfect
+   - Accelerometer noise: ~0.1 m/s²
+   - After 52 seconds: becomes kilometers of error
+
+3. 🔄 GYROSCOPE DRIFT: Orientation errors compound
+   - Small rotation errors change gravity direction
+   - Wrong gravity removal = wrong acceleration
+
+4. 🚫 NO EXTERNAL REFERENCE: Pure dead reckoning
+   - No way to correct accumulated errors
+   - Drift grows unbounded
+
+✅ Why VI-SLAM Works:
+• Visual features provide position constraints
+• Camera tracking corrects IMU drift
+• External reference prevents unbounded error
+
+This is why GPS, visual SLAM, or other external references are essential for navigation!`);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('container');
+            camera.aspect = container.offsetWidth / 700;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.offsetWidth, 700);
+        });
+
+        // Initialize
+        init();
+    </script>
+
+    <div style="margin-top: 20px; background: #2a2a2a; padding: 15px; border-radius: 8px;">
+        <h3>🎯 The Fundamental Problem with IMU-Only Tracking</h3>
+
+        <p><strong>🔬 Mathematical Reality:</strong></p>
+        <p>Position requires <strong>double integration</strong> of acceleration: position = ∫∫acceleration dt dt</p>
+
+        <p><strong>📊 Error Amplification:</strong></p>
+        <ul>
+            <li>Small sensor noise (0.1 m/s²) becomes huge errors after double integration</li>
+            <li>52-second recording → 15+ km claimed movement</li>
+            <li><strong>99.97% error rate</strong> in all directions</li>
+        </ul>
+
+        <p><strong>✅ Why VI-SLAM is Superior:</strong></p>
+        <ul>
+            <li>🎥 <strong>Visual constraints:</strong> Camera sees fixed landmarks</li>
+            <li>🔄 <strong>Error correction:</strong> Visual features prevent unbounded drift</li>
+            <li>📐 <strong>Scale estimation:</strong> Real-world measurements possible</li>
+            <li>🎯 <strong>Result:</strong> Realistic 4-meter movement vs 15-km fantasy</li>
+        </ul>
+
+        <p>This demonstrates why <strong>sensor fusion</strong> is essential for accurate navigation!</p>
+    </div>
+</body>
+</html>

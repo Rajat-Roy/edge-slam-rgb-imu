@@ -1,0 +1,13 @@
+R_DEF: Internal format may change without notice
+local
+id frameCountText
+id imuCountText
+id previewView
+id recordButton
+id statusText
+id stopButton
+layout activity_main
+string app_name
+style Theme.SLAMLogger
+xml backup_rules
+xml data_extraction_rules

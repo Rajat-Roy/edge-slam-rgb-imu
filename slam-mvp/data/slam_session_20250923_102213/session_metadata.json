@@ -1,0 +1,9 @@
+{
+  "endTime": 1758603185665,
+  "frameRate": 29.923809523809524,
+  "imuSampleRate": 399.12380952380954,
+  "sessionId": "slam_session_20250923_102213",
+  "startTime": 1758603133165,
+  "totalFrames": 1571,
+  "totalImuSamples": 20954
+}
